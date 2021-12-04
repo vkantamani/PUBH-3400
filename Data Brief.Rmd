@@ -1,0 +1,1630 @@
+---
+title: "Assessment 5"
+author: "Vivek Kantamani"
+date: "10/27/2020"
+output: pdf_document
+header-includes:
+    - \usepackage[labelformat=empty]{caption}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Research Question (RQ)
+
+Do adults in different age groups (18-24 yrs, 25-44 yrs, 45-64 yrs, 65+ yrs) differ in access to treatment for a mental health problem across income levels (<100% FPL, 100-400% FPL, >400% FPL) in NYC in 2018?  
+
+### Setup, Data Cleaning
+
+```{r, warning = F}
+# Load libraries
+library(sas7bdat)
+library(survey)
+library(kableExtra)
+library(epitools)
+```
+
+```{r}
+# Read in data
+nyc_chs = read.sas7bdat("NYC-CHS_2018.sas7bdat")
+```
+
+```{r}
+# Characteristics of data
+# View(nyc_chs)
+dim(nyc_chs)
+```
+
+```{r}
+# Create a dataframe that contains the variables relevant to the RQ
+df = cbind(nyc_chs$agegroup,
+           nyc_chs$birthsex,
+           nyc_chs$imputed_povertygroup,
+           nyc_chs$education,
+           nyc_chs$insuredgateway18,
+           nyc_chs$mood11,
+           nyc_chs$wt19_dual,
+           nyc_chs$strata)
+
+colnames(df) = c("age",
+                 "sex",
+                 "income",
+                 "education",
+                 "insured",
+                 "treatmentMH",
+                 "wts",
+                 "str")
+
+df = data.frame(df)
+
+# Remove missing values
+df = na.omit(df)
+
+# Convert variables to factor variables, check contrasts
+df$age = factor(df$age,
+                levels = c(1,2,3,4),
+                labels = c("18-24 yrs", "25-44 yrs",
+                           "45-64 yrs", "65+ yrs"))
+contrasts(df$age)
+
+df$sex = factor(df$sex,
+                levels = c(1,2),
+                labels = c("Male", "Female"))
+contrasts(df$sex)
+
+df$income_recode = ifelse(df$income==1, 1,
+                           ifelse(df$income==2, 2,
+                                  ifelse(df$income==3, 2,
+                                         ifelse(df$income==4, 3, 3))))
+df$income_recode = factor(df$income_recode,
+                           levels = c(1,2,3),
+                           labels = c("<100% FPL", "100-400% FPL", ">400% FPL"))
+contrasts(df$income_recode)
+
+df$income = factor(df$income,
+                    levels = c(1,2,3,4,5),
+                    labels = c("<100% FPL", "100-200% FPL", "200-400% FPL",
+                               "400-600% FPL", ">600% FPL"))
+contrasts(df$income)
+
+df$education_recode = ifelse(df$education==1, 1, 2)
+df$education_recode = factor(df$education_recode,
+                             levels = c(1,2),
+                             labels = c("Less Than HS", "HS Grad"))
+contrasts(df$education_recode)
+
+df$education = factor(df$education,
+                      levels = c(1,2,3,4),
+                      labels = c("Less Than HS","HS Grad",
+                                 "Some College","College Grad"))
+contrasts(df$education)
+
+df$insured = factor(df$insured,
+                    levels = c(2,1),
+                    labels = c("Not Insured", "Insured"))
+contrasts(df$insured)
+
+df$treatmentMH = factor(df$treatmentMH,
+                        levels = c(1,2),
+                        labels = c("Not Received","Received"))
+contrasts(df$treatmentMH)
+
+# Reorder dataframe columns
+col_order = c("age",
+              "sex",
+              "income",
+              "income_recode",
+              "education",
+              "education_recode",
+              "insured",
+              "treatmentMH",
+              "wts",
+              "str")
+
+df = df[, col_order]
+colnames(df)
+```
+
+### Univariate Analysis (Table 1)
+
+```{r}
+# UNIVARIATE ANALYSIS
+
+# For each variable:
+# 1. Produce a table of frequencies and percents using table() and prop.table()
+# 2. Produce a table of weighted frequencies and weighted percents using svytable() and prop.table()
+# 3. Produce a table of all values using rbind() named kbl_var
+# 4. Name rows of kbl_var according to the levels of var
+
+# Obtain survey design object from svydesign()
+mydesign = svydesign(id = ~1,
+                     data = df,
+                     weight = ~wts,
+                     strata = ~str)
+# AGE
+tb_age = table(df$age)
+tb_age_prop = prop.table(tb_age)*100
+tbwt_age = svytable(~age, mydesign)
+tbwt_age_prop = prop.table(svytable(~age, mydesign))*100
+tb_age = rbind(tb_age, tb_age_prop,
+               tbwt_age, tbwt_age_prop)
+rownames(tb_age) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_age = round(tb_age,2)
+
+kbl_age = t(tb_age)
+rownames(kbl_age) =  c("18-24 yrs", "25-44 yrs",
+                       "45-64 yrs", "65+ yrs")
+
+# SEX
+tb_sex = table(df$sex)
+tb_sex_prop = prop.table(tb_sex)*100
+tbwt_sex = svytable(~sex, mydesign)
+tbwt_sex_prop = prop.table(svytable(~sex, mydesign))*100
+tb_sex = rbind(tb_sex, tb_sex_prop,
+               tbwt_sex, tbwt_sex_prop)
+rownames(tb_sex) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_sex = round(tb_sex,2)
+
+kbl_sex = t(tb_sex)
+rownames(kbl_sex) =  c("Male", "Female")
+
+# INCOME LEVEL
+tb_income = table(df$income)
+tb_income_prop = prop.table(tb_income)*100
+tbwt_income = svytable(~income, mydesign)
+tbwt_income_prop = prop.table(svytable(~income, mydesign))*100
+tb_income = rbind(tb_income, tb_income_prop,
+                   tbwt_income, tbwt_income_prop)
+rownames(tb_income) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_income = round(tb_income,2)
+
+kbl_income = t(tb_income)
+rownames(kbl_income) = c("<100% FPL", "100-200% FPL", "200-400% FPL",
+                         "400-600% FPL", ">600% FPL")
+
+# RECODED INCOME LEVEL
+tb_income_recode = table(df$income_recode)
+tb_income_recode_prop = prop.table(tb_income_recode)*100
+tbwt_income_recode = svytable(~income_recode, mydesign)
+tbwt_income_recode_prop = prop.table(svytable(~income_recode, mydesign))*100
+tb_income_recode = rbind(tb_income_recode, tb_income_recode_prop,
+                          tbwt_income_recode, tbwt_income_recode_prop)
+rownames(tb_income_recode) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_income_recode = round(tb_income_recode,2)
+
+kbl_income_recode = t(tb_income_recode)
+rownames(kbl_income_recode) = c("<100% FPL", "100-400% FPL", ">400% FPL")
+
+# LEVEL OF EDUCATIONAL ATTAINMENT
+tb_education = table(df$education)
+tb_education_prop = prop.table(tb_education)*100
+tbwt_education = svytable(~education, mydesign)
+tbwt_education_prop = prop.table(svytable(~education, mydesign))*100
+tb_education = rbind(tb_education, tb_education_prop,
+                     tbwt_education, tbwt_education_prop)
+rownames(tb_education) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_education = round(tb_education,2)
+
+kbl_education = t(tb_education)
+rownames(kbl_education) = c("Less Than High School","High School Graduate",
+                            "Some College","College Graduate")
+
+# RECODED LEVEL OF EDUCATIONAL ATTAINMENT
+tb_education_recode = table(df$education_recode)
+tb_education_recode_prop = prop.table(tb_education_recode)*100
+tbwt_education_recode = svytable(~education_recode, mydesign)
+tbwt_education_recode_prop = prop.table(svytable(~education_recode, mydesign))*100
+tb_education_recode = rbind(tb_education_recode, tb_education_recode_prop,
+                            tbwt_education_recode, tbwt_education_recode_prop)
+rownames(tb_education_recode) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_education_recode = round(tb_education_recode,2)
+
+kbl_education_recode = t(tb_education_recode)
+rownames(kbl_education_recode) = c("Less Than High School", "High School Graduate")
+
+# HEALTH INSURANCE COVERAGE STATUS
+tb_insured = table(df$insured)
+tb_insured_prop = prop.table(tb_insured)*100
+tbwt_insured = svytable(~insured, mydesign)
+tbwt_insured_prop = prop.table(svytable(~insured, mydesign))*100
+tb_insured = rbind(tb_insured, tb_insured_prop,
+                   tbwt_insured, tbwt_insured_prop)
+rownames(tb_insured) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_insured = round(tb_insured,2)
+
+kbl_insured = t(tb_insured)
+rownames(kbl_insured) = c("Not Insured", "Insured")
+
+# MENTAL HEALTH TREATMENT (RESPONSE)
+tb_treatmentMH = table(df$treatmentMH)
+tb_treatmentMH_prop = prop.table(tb_treatmentMH)*100
+tbwt_treatmentMH = svytable(~treatmentMH, mydesign)
+tbwt_treatmentMH_prop = prop.table(svytable(~treatmentMH, mydesign))*100
+tb_treatmentMH = rbind(tb_treatmentMH, tb_treatmentMH_prop,
+                       tbwt_treatmentMH, tbwt_treatmentMH_prop)
+rownames(tb_treatmentMH) = c("freq", "%", "wt-adj freq", "wt-adj %")
+tb_treatmentMH = round(tb_treatmentMH,2)
+
+kbl_treatmentMH = t(tb_treatmentMH)
+rownames(kbl_treatmentMH) = c("Not Received","Received")
+
+```
+
+```{r}
+# TABLE 1: CHARACTERISTICS OF STUDY SAMPLE (UNIVARIATE ANALYSIS)
+
+# Produce a table of all variables using rbind() named kbl_ua (i.e. ua = univariate analysis)
+kbl_ua = rbind(kbl_age,
+               kbl_sex,
+               kbl_income_recode,
+               kbl_education_recode,
+               kbl_insured,
+               kbl_treatmentMH)
+
+# Subset the frequency and weight-adjusted percent columns
+kbl_ua = kbl_ua[,c(1,4)]
+
+# Add trailing zeros as needed to standardize output
+kbl_ua[5,2] = paste(as.character(kbl_ua[5,2]), "0",
+                    sep = "")
+kbl_ua[6,2] = paste(as.character(kbl_ua[6,2]), "0",
+                    sep = "")
+
+# Add percent symbols to the weight-adjusted percent column
+for (i in 1:dim(kbl_ua)[1]) {
+  kbl_ua[i,2] = paste(as.character(kbl_ua[i,2]), "%",
+                       sep = "")
+}
+
+# Convert kbl_ua into the dataframe kbl_df_ua; name rows and columns
+kbl_df_ua = data.frame(kbl_ua)
+colnames(kbl_df_ua) = colnames(kbl_ua)
+rownames(kbl_df_ua) = row.names = c(c("18-24 yrs", "25-44 yrs","45-64 yrs", "65+ yrs"),
+                                    c("Male", "Female"),
+                                    c("<100% FPL ", "100-400% FPL", ">400% FPL"),
+                                    c("Less Than High School ", "High School Graduate "),
+                                    c("Not Insured", "Insured"),
+                                    c("Not Received","Received"))
+
+# Use the kableExtra package to produce latex table output
+kbl(kbl_df_ua,
+    format = "latex",
+    booktabs = T,
+    caption = "Table 1: Characteristics of Study Sample",
+    col.names = c("Frequency","Percent"),
+    align = c("cc")) %>%
+  kable_styling() %>%
+  pack_rows("Age", 1, 4) %>%
+  pack_rows("Sex at Birth", 5, 6) %>%
+  pack_rows("Income Level", 7, 9) %>%
+  pack_rows("Level of Educational Attainment", 10, 11) %>%
+  pack_rows("Health Insurance Coverage Status", 12, 13) %>%
+  pack_rows("Mental Health Treatment", 14, 15) %>%
+  footnote(general = c("Complete case analysis was utilized (n = 9855) to",
+                       "minimize use of imputed values of variables.",
+                       "Percent estimates were adjusted for sampling weight."),
+           general_title = "") %>%
+  landscape()
+```
+
+### Bivariate Analysis (Table 2) 
+
+```{r, warning = FALSE}
+# BIVARIATE ANALYSES (RESPONSE = MENTAL HEALTH TREATMENT)
+
+# For each variable (vs the response):
+# 1. Produce a table of frequencies and weight-adjusted percents for each variable vs the response
+# a. Use table() to produce a bivariate table of frequencies
+# b. Calculate a "Total" frequency column, add it to the table with cbind()
+# c. Use svytable() and prop.table() to produce a bivariate table of weighted percents, round to 2 trailing digits
+# d. Use paste() on each cell of a table called tbba_var (table bivariate analysis) to produce the following format: "freq (%)"
+
+# 2. Produce a vector of 95% CI of Wald odds ratios
+# a. Use oddsratio.wald()$measure to output a table of Wald odds ratios for unweighted and weighted data (to compare the two)
+# b. Extract the 95% CI from the weighted table into the vector odds_vec as character strings using paste() produce the following format: "(LB, UB)" or "1.000" for the baseline value
+
+# 3. Produce a vector of chi-squared statistics
+# a. Use chisq.test() and svychisq(,statistic = "Chisq") to produce unweighted and weighted chi-squared statistics for the variable (to compare the two)
+# b. Extract the weighted chi-squared statistic as a character using paste() into the variable pval
+# c. Create a vector pval_vec, repeating pval according to the number of levels of the variable in question (the repeated value is needed to compress the value in the kableExtra table)
+
+# 4. Merge the output for the variable
+# a. Use cbind() to merge the relevant output: cbind(tbba_var, odds_vec, pval_vec)
+
+# AGE
+tbba_age = table(df$age,
+                 df$treatmentMH)
+Total = c(tbba_age[1,1] + tbba_age[1,2],
+          tbba_age[2,1] + tbba_age[2,2],
+          tbba_age[3,1] + tbba_age[3,2],
+          tbba_age[4,1] + tbba_age[4,2])
+tbba_age = cbind(tbba_age, Total)
+
+tbbawt_age = svytable(~age + treatmentMH, mydesign)
+tbbawt_age = prop.table(tbbawt_age)*100
+tbbawt_age = round(tbbawt_age,2)
+
+tbba_age[1,1] = paste(as.character(tbba_age[1,1]), "  (", as.character(tbbawt_age[1,1]), "0%)",
+                      sep = "")
+tbba_age[1,2] = paste(as.character(tbba_age[1,2]), "  (", as.character(tbbawt_age[1,2]), "%)",
+                      sep = "")
+tbba_age[1,3] = paste(as.character(tbba_age[1,3]), "  (", as.character(tbbawt_age[1,1] + tbbawt_age[1,2]), "%)",
+                      sep = "")
+tbba_age[2,1] = paste(as.character(tbba_age[2,1]), " (", as.character(tbbawt_age[2,1]), "%)",
+                      sep = "")
+tbba_age[2,2] = paste(as.character(tbba_age[2,2]), " (", as.character(tbbawt_age[2,2]), "0%)",
+                      sep = "")
+tbba_age[2,3] = paste(as.character(tbba_age[2,3]), " (", as.character(tbbawt_age[2,1] + tbbawt_age[2,2]), "%)",
+                      sep = "")
+tbba_age[3,1] = paste(as.character(tbba_age[3,1]), "  (", as.character(tbbawt_age[3,1]), "%)",
+                      sep = "")
+tbba_age[3,2] = paste(as.character(tbba_age[3,2]), " (", as.character(tbbawt_age[3,2]), "0%)",
+                      sep = "")
+tbba_age[3,3] = paste(as.character(tbba_age[3,3]), " (", as.character(tbbawt_age[3,1] + tbbawt_age[3,2]), "%)",
+                      sep = "")
+tbba_age[4,1] = paste(as.character(tbba_age[4,1]), "  (", as.character(tbbawt_age[4,1]), "%)",
+                      sep = "")
+tbba_age[4,2] = paste(as.character(tbba_age[4,2]), " (", as.character(tbbawt_age[4,2]), "%)",
+                      sep = "")
+tbba_age[4,3] = paste(as.character(tbba_age[4,3]), " (", as.character(tbbawt_age[4,1] + tbbawt_age[4,2]), "%)",
+                      sep = "")
+
+# AGE ODDS RATIO
+wald_age = table(df$age,
+                 df$treatmentMH)
+age_odds = oddsratio.wald(wald_age)$measure
+
+wald_wtage = svytable(~age + treatmentMH, mydesign)
+age_wtodds = oddsratio.wald(wald_wtage)$measure
+age_wtodds
+odds_vec = c("1.000",
+             paste("(", as.character(round(age_wtodds[2,2],3)), ", ", as.character(round(age_wtodds[2,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds[3,2],3)), ", ", as.character(round(age_wtodds[3,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds[4,2],3)), ", ", as.character(round(age_wtodds[4,3],3)), ")", sep = ""))
+
+# AGE CHI-SQ
+chi_age = chisq.test(df$age,
+                     df$treatmentMH)
+
+chiwt_age = svychisq(~age + treatmentMH,
+                     mydesign,
+                     statistic = "Chisq")
+
+pval = paste(as.character(round(chiwt_age$p.value,4)), "0**",
+             sep="")
+pval_vec = rep(pval, 4)
+tbba_age = cbind(tbba_age, odds_vec, pval_vec)
+
+# SEX
+tbba_sex = table(df$sex,
+                 df$treatmentMH)
+Total = c(tbba_sex[1,1] + tbba_sex[1,2],
+          tbba_sex[2,1] + tbba_sex[2,2])
+tbba_sex = cbind(tbba_sex, Total)
+
+tbbawt_sex = svytable(~sex + treatmentMH, mydesign)
+tbbawt_sex = prop.table(tbbawt_sex)*100
+tbbawt_sex = round(tbbawt_sex,2)
+
+tbba_sex[1,1] = paste(as.character(tbba_sex[1,1]), " (", as.character(tbbawt_sex[1,1]), "%)",
+                      sep = "")
+tbba_sex[1,2] = paste(as.character(tbba_sex[1,2]), " (", as.character(tbbawt_sex[1,2]), "%)",
+                      sep = "")
+tbba_sex[1,3] = paste(as.character(tbba_sex[1,3]), " (", as.character(tbbawt_sex[1,1] + tbbawt_sex[1,2]), "0%)",
+                      sep = "")
+tbba_sex[2,1] = paste(as.character(tbba_sex[2,1]), " (", as.character(tbbawt_sex[2,1]), "%)",
+                      sep = "")
+tbba_sex[2,2] = paste(as.character(tbba_sex[2,2]), " (", as.character(tbbawt_sex[2,2]), "%)",
+                      sep = "")
+tbba_sex[2,3] = paste(as.character(tbba_sex[2,3]), " (", as.character(tbbawt_sex[2,1] + tbbawt_sex[2,2]), "0%)",
+                      sep = "")
+
+# SEX ODDS RATIO
+wald_sex = table(df$sex,
+                 df$treatmentMH)
+sex_odds = oddsratio.wald(wald_sex)$measure
+
+wald_wtsex = svytable(~sex + treatmentMH, mydesign)
+sex_wtodds = oddsratio.wald(wald_wtsex)$measure
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(sex_wtodds[2,2],3)), ", ", as.character(round(sex_wtodds[2,3],3)), "0)", sep = ""))
+
+# SEX CHI-SQ
+chi_sex = chisq.test(df$sex,
+                     df$treatmentMH)
+
+chiwt_sex = svychisq(~sex + treatmentMH,
+                     mydesign,
+                     statistic = "Chisq")
+
+pval_vec = rep(round(chiwt_sex$p.value,4), 4)
+tbba_sex = cbind(tbba_sex, odds_vec, pval_vec)
+
+# INCOME LEVEL
+tbba_income = table(df$income,
+                     df$treatmentMH)
+Total = c(tbba_income[1,1] + tbba_income[1,2],
+          tbba_income[2,1] + tbba_income[2,2],
+          tbba_income[3,1] + tbba_income[3,2],
+          tbba_income[4,1] + tbba_income[4,2],
+          tbba_income[5,1] + tbba_income[5,2])
+tbba_income = cbind(tbba_income, Total)
+
+tbbawt_income = svytable(~income + treatmentMH, mydesign)
+tbbawt_income = prop.table(tbbawt_income)*100
+tbbawt_income = round(tbbawt_income,2)
+
+tbba_income[1,1] = paste(as.character(tbba_income[1,1]), " (", as.character(tbbawt_income[1,1]), "%)",
+                          sep = "")
+tbba_income[1,2] = paste(as.character(tbba_income[1,2]), " (", as.character(tbbawt_income[1,2]), "%)",
+                          sep = "")
+tbba_income[1,3] = paste(as.character(tbba_income[1,3]), " (", as.character(tbbawt_income[1,1] + tbbawt_income[1,2]), "%)",
+                          sep = "")
+tbba_income[2,1] = paste(as.character(tbba_income[2,1]), "  (", as.character(tbbawt_income[2,1]), "%)",
+                          sep = "")
+tbba_income[2,2] = paste(as.character(tbba_income[2,2]), " (", as.character(tbbawt_income[2,2]), "0%)",
+                          sep = "")
+tbba_income[2,3] = paste(as.character(tbba_income[2,3]), " (", as.character(tbbawt_income[2,1] + tbbawt_income[2,2]), "%)",
+                          sep = "")
+tbba_income[3,1] = paste(as.character(tbba_income[3,1]), "  (", as.character(tbbawt_income[3,1]), "%)",
+                          sep = "")
+tbba_income[3,2] = paste(as.character(tbba_income[3,2]), " (", as.character(tbbawt_income[3,2]), "%)",
+                          sep = "")
+tbba_income[3,3] = paste(as.character(tbba_income[3,3]), " (", as.character(tbbawt_income[3,1] + tbbawt_income[3,2]), "%)",
+                          sep = "")
+tbba_income[4,1] = paste(as.character(tbba_income[4,1]), "  (", as.character(tbbawt_income[4,1]), "%)",
+                          sep = "")
+tbba_income[4,2] = paste(as.character(tbba_income[4,2]), " (", as.character(tbbawt_income[4,2]), "%)",
+                          sep = "")
+tbba_income[4,3] = paste(as.character(tbba_income[4,3]), " (", as.character(tbbawt_income[4,1] + tbbawt_income[4,2]), "%)",
+                          sep = "")
+tbba_income[5,1] = paste(as.character(tbba_income[5,1]), "  (", as.character(tbbawt_income[5,1]), "%)",
+                          sep = "")
+tbba_income[5,2] = paste(as.character(tbba_income[5,2]), " (", as.character(tbbawt_income[5,2]), "%)",
+                          sep = "")
+tbba_income[5,3] = paste(as.character(tbba_income[5,3]), " (", as.character(tbbawt_income[5,1] + tbbawt_income[5,2]), "%)",
+                          sep = "")
+
+# INCOME LEVEL ODDS RATIO
+wald_income = table(df$income,
+                     df$treatmentMH)
+income_odds = oddsratio.wald(wald_income)$measure
+
+wald_wtincome = svytable(~income + treatmentMH, mydesign)
+income_wtodds = oddsratio.wald(wald_wtincome)$measure
+
+odds_vec = round(income_wtodds[,1],3)
+odds_vec = as.character(odds_vec)
+odds_vec[1] = paste(odds_vec[1], ".000", sep = "")
+
+# INCOME LEVEL CHI-SQ
+chi_income = chisq.test(df$income,
+                         df$treatmentMH)
+
+chiwt_income = svychisq(~income + treatmentMH,
+                       mydesign,
+                       statistic = "Chisq")
+
+pval = paste(as.character(round(chiwt_income$p.value,4)), "0**",
+             sep="")
+pval_vec = rep(pval, 5)
+tbba_income = cbind(tbba_income, odds_vec, pval_vec)
+
+# RECODED INCOME LEVEL
+tbba_income_recode = table(df$income_recode,
+                            df$treatmentMH)
+Total = c(tbba_income_recode[1,1] + tbba_income_recode[1,2],
+          tbba_income_recode[2,1] + tbba_income_recode[2,2],
+          tbba_income_recode[3,1] + tbba_income_recode[3,2])
+tbba_income_recode = cbind(tbba_income_recode, Total)
+
+tbbawt_income_recode = svytable(~income_recode + treatmentMH, mydesign)
+tbbawt_income_recode = prop.table(tbbawt_income_recode)*100
+tbbawt_income_recode = round(tbbawt_income_recode,2)
+
+tbba_income_recode[1,1] = paste(as.character(tbba_income_recode[1,1]), " (", as.character(tbbawt_income_recode[1,1]), "%)",
+                                 sep = "")
+tbba_income_recode[1,2] = paste(as.character(tbba_income_recode[1,2]), " (", as.character(tbbawt_income_recode[1,2]), "%)",
+                                 sep = "")
+tbba_income_recode[1,3] = paste(as.character(tbba_income_recode[1,3]), " (", as.character(tbbawt_income_recode[1,1] + tbbawt_income_recode[1,2]), "%)",
+                                 sep = "")
+tbba_income_recode[2,1] = paste(as.character(tbba_income_recode[2,1]), " (", as.character(tbbawt_income_recode[2,1]), "%)",
+                                 sep = "")
+tbba_income_recode[2,2] = paste(as.character(tbba_income_recode[2,2]), " (", as.character(tbbawt_income_recode[2,2]), "%)",
+                                 sep = "")
+tbba_income_recode[2,3] = paste(as.character(tbba_income_recode[2,3]), " (", as.character(tbbawt_income_recode[2,1] + tbbawt_income_recode[2,2]), "%)",
+                                 sep = "")
+tbba_income_recode[3,1] = paste(as.character(tbba_income_recode[3,1]), " (", as.character(tbbawt_income_recode[3,1]), "%)",
+                                 sep = "")
+tbba_income_recode[3,2] = paste(as.character(tbba_income_recode[3,2]), " (", as.character(tbbawt_income_recode[3,2]), "%)",
+                                 sep = "")
+tbba_income_recode[3,3] = paste(as.character(tbba_income_recode[3,3]), " (", as.character(tbbawt_income_recode[3,1] + tbbawt_income_recode[3,2]), "%)",
+                                 sep = "")
+
+# RECODED INCOME LEVEL ODDS RATIO
+wald_income_recode = table(df$income_recode,
+                            df$treatmentMH)
+income_recode_odds = oddsratio.wald(wald_income_recode)$measure
+
+wald_wtincome_recode = svytable(~income_recode + treatmentMH, mydesign)
+income_recode_wtodds = oddsratio.wald(wald_wtincome_recode)$measure
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(income_recode_wtodds[2,2],3)), ", ", as.character(round(income_recode_wtodds[2,3],3)), ")", sep = ""),
+             paste("(", as.character(round(income_recode_wtodds[3,2],3)), ", ", as.character(round(income_recode_wtodds[3,3],3)), ")", sep = ""))
+
+# RECODED INCOME LEVEL CHI-SQ
+chi_income_recode = chisq.test(df$income_recode,
+                                df$treatmentMH)
+
+chiwt_income_recode = svychisq(~income_recode + treatmentMH,
+                                mydesign,
+                                statistic = "Chisq")
+
+pval = paste(as.character(round(chiwt_income_recode$p.value,4)), "**",
+             sep="")
+pval_vec = rep(pval, 3)
+tbba_income_recode = cbind(tbba_income_recode, odds_vec, pval_vec)
+
+# LEVEL OF EDUCATIONAL ATTAINMENT
+tbba_education = table(df$education,
+                       df$treatmentMH)
+Total = c(tbba_education[1,1] + tbba_education[1,2],
+          tbba_education[2,1] + tbba_education[2,2],
+          tbba_education[3,1] + tbba_education[3,2],
+          tbba_education[4,1] + tbba_education[4,2])
+tbba_education = cbind(tbba_education, Total)
+rownames(tbba_education) = c("Less Than High School","High School Graduate",
+                             "Some College","College Graduate")
+
+tbbawt_education = svytable(~education + treatmentMH, mydesign)
+tbbawt_education = prop.table(tbbawt_education)*100
+tbbawt_education = round(tbbawt_education,2)
+
+tbba_education[1,1] = paste(as.character(tbba_education[1,1]), "  (", as.character(tbbawt_education[1,1]), "%)",
+                            sep = "")
+tbba_education[1,2] = paste(as.character(tbba_education[1,2]), " (", as.character(tbbawt_education[1,2]), "%)",
+                            sep = "")
+tbba_education[1,3] = paste(as.character(tbba_education[1,3]), " (", as.character(tbbawt_education[1,1] + tbbawt_education[1,2]), "%)",
+                            sep = "")
+tbba_education[2,1] = paste(as.character(tbba_education[2,1]), "  (", as.character(tbbawt_education[2,1]), "%)",
+                            sep = "")
+tbba_education[2,2] = paste(as.character(tbba_education[2,2]), " (", as.character(tbbawt_education[2,2]), "%)",
+                            sep = "")
+tbba_education[2,3] = paste(as.character(tbba_education[2,3]), " (", as.character(tbbawt_education[2,1] + tbbawt_education[2,2]), "0%)",
+                            sep = "")
+tbba_education[3,1] = paste(as.character(tbba_education[3,1]), "  (", as.character(tbbawt_education[3,1]), "%)",
+                            sep = "")
+tbba_education[3,2] = paste(as.character(tbba_education[3,2]), " (", as.character(tbbawt_education[3,2]), "%)",
+                            sep = "")
+tbba_education[3,3] = paste(as.character(tbba_education[3,3]), " (", as.character(tbbawt_education[3,1] + tbbawt_education[3,2]), "%)",
+                            sep = "")
+tbba_education[4,1] = paste(as.character(tbba_education[4,1]), " (", as.character(tbbawt_education[4,1]), "%)",
+                            sep = "")
+tbba_education[4,2] = paste(as.character(tbba_education[4,2]), " (", as.character(tbbawt_education[4,2]), "%)",
+                            sep = "")
+tbba_education[4,3] = paste(as.character(tbba_education[4,3]), " (", as.character(tbbawt_education[4,1] + tbbawt_education[4,2]), "%)",
+                            sep = "")
+
+# LEVEL OF EDUCATIONAL ATTAINMENT ODDS RATIO
+wald_education = table(df$education,
+                       df$treatmentMH)
+education_odds = oddsratio.wald(wald_education)$measure
+
+wald_wteducation = svytable(~education + treatmentMH, mydesign)
+education_wtodds = oddsratio.wald(wald_wteducation)$measure
+
+odds_vec = round(education_wtodds[,1],3)
+odds_vec = as.character(odds_vec)
+odds_vec[1] = paste(odds_vec[1], ".000", sep = "")
+
+# LEVEL OF EDUCATIONAL ATTAINMENT CHI-SQ
+chi_education = chisq.test(df$education,df$treatmentMH)
+
+chiwt_education = svychisq(~education + treatmentMH,
+                           mydesign,
+                           statistic = "Chisq")
+
+pval_vec = rep(round(chiwt_education$p.value,4), 4)
+tbba_education = cbind(tbba_education,odds_vec, pval_vec)
+
+# RECODED LEVEL OF EDUCATIONAL ATTAINMENT
+tbba_education_recode = table(df$education_recode,
+                              df$treatmentMH)
+Total = c(tbba_education_recode[1,1] + tbba_education_recode[1,2],
+          tbba_education_recode[2,1] + tbba_education_recode[2,2])
+tbba_education_recode = cbind(tbba_education_recode, Total)
+rownames(tbba_education_recode) = c("Less Than High School", "High School Graduate")
+
+tbbawt_education_recode = svytable(~education_recode + treatmentMH, mydesign)
+tbbawt_education_recode = prop.table(tbbawt_education_recode)*100
+tbbawt_education_recode = round(tbbawt_education_recode,2)
+
+tbba_education_recode[1,1] = paste(as.character(tbba_education_recode[1,1]), "  (", as.character(tbbawt_education_recode[1,1]), "%)",
+                                   sep = "")
+tbba_education_recode[1,2] = paste(as.character(tbba_education_recode[1,2]), " (", as.character(tbbawt_education_recode[1,2]), "%)",
+                                   sep = "")
+tbba_education_recode[1,3] = paste(as.character(tbba_education_recode[1,3]), " (", as.character(tbbawt_education_recode[1,1] + tbbawt_education_recode[1,2]), "%)",
+                                   sep = "")
+tbba_education_recode[2,1] = paste(as.character(tbba_education_recode[2,1]), " (", as.character(tbbawt_education_recode[2,1]), "0%)",
+                                   sep = "")
+tbba_education_recode[2,2] = paste(as.character(tbba_education_recode[2,2]), " (", as.character(tbbawt_education_recode[2,2]), "%)",
+                                   sep = "")
+tbba_education_recode[2,3] = paste(as.character(tbba_education_recode[2,3]), " (", as.character(tbbawt_education_recode[2,1] + tbbawt_education_recode[2,2]), "%)",
+                                   sep = "")
+
+# RECODED LEVEL OF EDUCATIONAL ATTAINMENT ODDS RATIO
+wald_education_recode = table(df$education_recode,
+                              df$treatmentMH)
+education_recode_odds = oddsratio.wald(wald_education_recode)$measure
+
+wald_wteducation_recode = svytable(~education_recode + treatmentMH, mydesign)
+education_recode_wtodds = oddsratio.wald(wald_wteducation_recode)$measure
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(education_recode_wtodds[2,2],3)), ", ", as.character(round(education_recode_wtodds[2,3],3)), "00)", sep = ""))
+
+# RECODED LEVEL OF EDUCATIONAL ATTAINMENT CHI-SQ
+chi_education_recode = chisq.test(df$education_recode,
+                                  df$treatmentMH)
+
+chiwt_education_recode = svychisq(~education_recode + treatmentMH,
+                                  mydesign,
+                                  statistic = "Chisq")
+
+pval_vec = rep(round(chiwt_education_recode$p.value,4), 2)
+tbba_education_recode = cbind(tbba_education_recode, odds_vec, pval_vec)
+
+# HEALTH INSURANCE COVERAGE STATUS
+tbba_insured = table(df$insured,
+                     df$treatmentMH)
+Total = c(tbba_insured[1,1] + tbba_insured[1,2],
+          tbba_insured[2,1] + tbba_insured[2,2])
+tbba_insured = cbind(tbba_insured, Total)
+
+tbbawt_insured = svytable(~insured + treatmentMH, mydesign)
+tbbawt_insured = prop.table(tbbawt_insured)*100
+tbbawt_insured = round(tbbawt_insured,2)
+
+tbba_insured[1,1] = paste(as.character(tbba_insured[1,1]), "  (", as.character(tbbawt_insured[1,1]), "%)",
+                          sep = "")
+tbba_insured[1,2] = paste(as.character(tbba_insured[1,2]), "  (", as.character(tbbawt_insured[1,2]), "%)",
+                          sep = "")
+tbba_insured[1,3] = paste(as.character(tbba_insured[1,3]), "  (", as.character(tbbawt_insured[1,1] + tbbawt_insured[1,2]), "%)",
+                          sep = "")
+tbba_insured[2,1] = paste(as.character(tbba_insured[2,1]), " (", as.character(tbbawt_insured[2,1]), "%)",
+                          sep = "")
+tbba_insured[2,2] = paste(as.character(tbba_insured[2,2]), " (", as.character(tbbawt_insured[2,2]), "%)",
+                          sep = "")
+tbba_insured[2,3] = paste(as.character(tbba_insured[2,3]), " (", as.character(tbbawt_insured[2,1] + tbbawt_insured[2,2]), "%)",
+                          sep = "")
+
+# HEALTH INSURANCE COVERAGE STATUS ODDS RATIO
+wald_insured = table(df$insured,
+                     df$treatmentMH)
+insured_odds = oddsratio.wald(wald_insured)$measure
+
+wald_wtinsured = svytable(~insured + treatmentMH, mydesign)
+insured_wtodds = oddsratio.wald(wald_wtinsured)$measure
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(insured_wtodds[2,2],3)), ", ", as.character(round(insured_wtodds[2,3],3)), ")", sep = ""))
+
+# HEALTH INSURANCE COVERAGE STATUS CHI-SQ
+chi_insured = chisq.test(df$insured,
+                         df$treatmentMH)
+
+chiwt_insured = svychisq(~insured + treatmentMH,
+                         mydesign,
+                         statistic = "Chisq")
+
+pval_vec = rep(round(chiwt_insured$p.value,4), 2)
+tbba_insured = cbind(tbba_insured, odds_vec, pval_vec)
+```
+
+```{r}
+# TABLE 2: BIVARIATE ANALYSIS (BIVARIATE ANALYSIS OUTPUT TABLE)
+
+# Produce a table of all variables using rbind() named kbl_ba (i.e. ba = bivariate analysis)
+kbl_ba = rbind(tbba_age,
+               tbba_income_recode)
+
+# Convert kbl_ba into the dataframe kbl_df_ba; name rows and columns
+kbl_df_ba = data.frame(kbl_ba)
+colnames(kbl_df_ba) = c("Not Received", "Received", "Total",
+                        "Wald Odds Ratio (95% CI)", "Pearson's Chi-Squared Test (p-value)")
+rownames(kbl_df_ba) = c(c("18-24 yrs", "25-44 yrs","45-64 yrs", "65+ yrs"),
+                        c("<100% FPL ", "100-400% FPL", ">400% FPL"))
+
+# Convert the p-value column into a factor (to ensure that kableExtra can compress the values in the ouptut)
+kbl_df_ba[,5] = factor(kbl_df_ba[,5])
+
+# Use the kableExtra package to produce latex table output
+kbl(kbl_df_ba,
+    format = "latex",
+    booktabs = T,
+    caption = "Table 2: Bivariate Analyses",
+    col.names = c("Not Received", "Received", "Total", "Wald Odds Ratio (95% CI)", "Pearson's Chi-Squared Test (p-value)"),
+    align = c("ccccc")) %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Mental Health Treatment (Response)" = 4, " " = 1), bold = T) %>%
+  column_spec(5, width = "2.82cm") %>%
+  column_spec(6, width = "2.82cm") %>%
+  pack_rows("Age", 1, 4) %>%
+  pack_rows("Income Level", 5, 7) %>%
+  collapse_rows(columns = 6, valign = "middle", latex_hline = "none") %>%
+  footnote(general = c("Alpha levels of 0.05 (*), 0.01 (**), and 0.001 (***) were used in inferential procedures.",
+                       "The Wald odds ratio (95% CI) indicates the odds of receiving mental health treatment relative to baseline.",
+                       "Percent estimates, Wald odds ratios, and Pearson's chi-squared tests were adjusted for sampling weight."),
+           general_title = "") %>%
+  landscape()
+```
+
+### Bivariate Visualizations
+
+```{r}
+# VISUALIZATIONS - BAR GRAPH, STANDARDIZED BAR GRAPH
+
+# For each variable (vs the response):
+# 1. png() function for .png output; change the name of "Var.png" for each variable
+# png("Var.png",
+#     width = 2000,
+#     height = 1200,
+#     res = 200)
+
+# 2. Prepare plot output settings
+# par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+# 3. Produce a stacked percent bar graph
+# a. Use svytable() and prop.table() to produce a table of weighted proportions
+# b. Transpose the table using t() and reorder the variables so that the independent variable is on the x-axis
+# c.
+# barplot(bar_age,
+#        main = "Var (Bar Graph)",
+#        xlab = "",
+#        ylab = "Percent (Weight-Adjusted)",
+#        ylim = c(0,90),
+#        col = c(4,2),
+#        border = "white")
+
+# 4. Produce a standardized bag graph (that mirrors the stacked bar graph)
+# a. Use addmargins(bar_age,2) to produce a table with appropriate margins
+# b. Calculate ratio percentages
+# standardbar_age[1,] = standardbar_age[1,]/standardbar_age[3,]
+# standardbar_age[2,] = standardbar_age[2,]/standardbar_age[3,]
+# c. Remove margin row 
+# standardbar_age = standardbar_age[c(1,2),]
+# d.
+# barplot(standardbar_age,
+#         main = "Age (Standardized Bar Graph)",
+#         xlab = "Age",
+#         ylab = "Ratio (Weight-Adjusted)",
+#         col = c(4,2),
+#         border = "white")
+
+# 5. Prepare legend output settings
+# par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+# 6. Produce the  legend
+# plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+# legend(x = "bottom",
+#        title = "Mental Health Treatment",
+#        legend = c("Received", "Not Received"), 
+#        fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+#        xpd = TRUE)
+
+# 7. dev.off() to finalize the .png file
+
+# AGE
+png("Age.png",
+    width = 2000,
+    height = 1200,
+    res = 200)
+
+par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+bar_age = svytable(~age + treatmentMH, mydesign)
+bar_age = prop.table(bar_age)*100
+bar_age = t(bar_age)[c(2,1),]
+
+barplot(bar_age,
+        main = "Age (Bar Graph)",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,90),
+        col = c(4,2),
+        border = "white")
+
+standardbar_age = addmargins(bar_age, 1)
+standardbar_age[1,] = standardbar_age[1,]/standardbar_age[3,]
+standardbar_age[2,] = standardbar_age[2,]/standardbar_age[3,]
+standardbar_age = standardbar_age[c(1,2),]
+
+barplot(standardbar_age,
+        main = "Age (Standardized Bar Graph)",
+        xlab = "Age",
+        ylab = "Ratio (Weight-Adjusted)",
+        col = c(4,2),
+        border = "white")
+
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+legend(x = "bottom",
+       title = "Mental Health Treatment",
+       legend = c("Received", "Not Received"), 
+       fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+       xpd = TRUE)
+
+dev.off()
+
+# INCOME LEVEL
+png("Income Level.png",
+    width = 2000,
+    height = 1200,
+    res = 200)
+
+par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+bar_inc = svytable(~income_recode + treatmentMH, mydesign)
+bar_inc = prop.table(bar_inc)*100
+bar_inc = t(bar_inc)[c(2,1),]
+
+barplot(bar_inc,
+        main = "Income Level (Bar Graph)",
+        xlab = "Income Level",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,90),
+        col = c(4,2),
+        border = "white")
+
+standardbar_inc = addmargins(bar_inc, 1)
+standardbar_inc[1,] = standardbar_inc[1,]/standardbar_inc[3,]
+standardbar_inc[2,] = standardbar_inc[2,]/standardbar_inc[3,]
+standardbar_inc = standardbar_inc[c(1,2),]
+
+barplot(standardbar_inc,
+        main = "Income Level (Standardized Bar Graph)",
+        xlab = "Income Level",
+        ylab = "Ratio (Weight-Adjusted)",
+        col = c(4,2),
+        border = "white")
+
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+legend(x = "bottom",
+       title = "Mental Health Treatment",
+       legend = c("Received", "Not Received"), 
+       fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+       xpd = TRUE)
+
+dev.off()
+```
+### Multivariate Analysis (Table 3)
+
+```{r}
+# Subset new dataframes for each level of income level (z variable)
+df_inc1 = df[df$income_recode == "<100% FPL",]
+df_inc2 = df[df$income_recode == "100-400% FPL",]
+df_inc3 = df[df$income_recode == ">400% FPL",]
+
+# Confirm number of observations is equivalent
+dim(df_inc1)
+dim(df_inc2)
+dim(df_inc3)
+identical(dim(df)[1],
+          dim(df_inc1)[1]+dim(df_inc2)[1]+dim(df_inc3)[1])
+```
+
+```{r, warning = FALSE}
+# MULTIVARIATE ANALYSES (RESPONSE = MENTAL HEALTH TREATMENT)
+
+# For age vs the response, split by the levels of income level:
+
+# 1. Produce the necessary survey design object for the given income level
+
+# 2. Produce a table of frequencies and weight-adjusted percents for age vs the response
+# a. Use table() to produce a bivariate table of frequencies
+# b. Calculate a "Total" frequency column, add it to the table with cbind()
+# c. Use svytable() and prop.table() to produce a bivariate table of weighted percents, round to 2 trailing digits
+# d. Use paste() on each cell of a table called tbba_var (table bivariate analysis) to produce the following format: "freq (%)"
+
+# 3. Produce a vector of 95% CI of Wald odds ratios
+# a. Use oddsratio.wald()$measure to output a table of Wald odds ratios for unweighted and weighted data (to compare the two)
+# b. Extract the 95% CI from the weighted table into the vector odds_vec as character strings using paste() produce the following format: "(LB, UB)" or "1.000" for the baseline value
+
+# 4. Produce a vector of chi-squared statistics
+# a. Change PSU settings of survey package as needed to ensure that tests can run
+# b. Use chisq.test() and svychisq(,statistic = "Chisq") to produce unweighted and weighted chi-squared statistics for the variable (to compare the two)
+# c. Extract the weighted chi-squared statistic as a character using paste() into the variable pval
+# d. Create a vector pval_vec, repeating pval according to the number of levels of the variable in question (the repeated value is needed to compress the value in the kableExtra table)
+
+# 5. Merge the output for the variable
+# a. Use cbind() to merge the relevant output: cbind(tbba_var, odds_vec, pval_vec)
+
+# SURVEY DESIGN, "<100% FPL"
+mydesign_inc1 = svydesign(id = ~1,
+                          data = df_inc1,
+                          weight = ~wts,
+                          strata = ~str)
+
+# AGE, "<100% FPL"
+tbma_age_inc1 = table(df_inc1$age,
+                      df_inc1$treatmentMH)
+Total = c(tbma_age_inc1[1,1] + tbma_age_inc1[1,2],
+          tbma_age_inc1[2,1] + tbma_age_inc1[2,2],
+          tbma_age_inc1[3,1] + tbma_age_inc1[3,2],
+          tbma_age_inc1[4,1] + tbma_age_inc1[4,2])
+tbma_age_inc1 = cbind(tbma_age_inc1, Total)
+
+tbmawt_age_inc1 = svytable(~age + treatmentMH, mydesign_inc1)
+tbmawt_age_inc1 = prop.table(tbmawt_age_inc1)*100
+tbmawt_age_inc1 = round(tbmawt_age_inc1,2)
+
+tbmawt_age_inc1_2 = svytable(~age+treatmentMH, mydesign_inc1)
+tbmawt_age_inc1_2 = prop.table(tbmawt_age_inc1_2, margin = 1)*100
+tbmawt_age_inc1_2 = round(tbmawt_age_inc1_2,2)
+
+
+tbma_age_inc1[1,1] = paste(as.character(tbma_age_inc1[1,1]), "  (", as.character(tbmawt_age_inc1_2[1,1]), "%)",
+                      sep = "")
+tbma_age_inc1[1,2] = paste(as.character(tbma_age_inc1[1,2]), "  (", as.character(tbmawt_age_inc1_2[1,2]), "%)",
+                      sep = "")
+tbma_age_inc1[1,3] = paste(as.character(tbma_age_inc1[1,3]), "  (", as.character(tbmawt_age_inc1[1,1] + tbmawt_age_inc1[1,2]), "%)",
+                      sep = "")
+tbma_age_inc1[2,1] = paste(as.character(tbma_age_inc1[2,1]), " (", as.character(tbmawt_age_inc1_2[2,1]), "%)",
+                      sep = "")
+tbma_age_inc1[2,2] = paste(as.character(tbma_age_inc1[2,2]), " (", as.character(tbmawt_age_inc1_2[2,2]), "%)",
+                      sep = "")
+tbma_age_inc1[2,3] = paste(as.character(tbma_age_inc1[2,3]), " (", as.character(tbmawt_age_inc1[2,1] + tbmawt_age_inc1[2,2]), "%)",
+                      sep = "")
+tbma_age_inc1[3,1] = paste(as.character(tbma_age_inc1[3,1]), "  (", as.character(tbmawt_age_inc1_2[3,1]), "%)",
+                      sep = "")
+tbma_age_inc1[3,2] = paste(as.character(tbma_age_inc1[3,2]), " (", as.character(tbmawt_age_inc1_2[3,2]), "%)",
+                      sep = "")
+tbma_age_inc1[3,3] = paste(as.character(tbma_age_inc1[3,3]), " (", as.character(tbmawt_age_inc1[3,1] + tbmawt_age_inc1[3,2]), "%)",
+                      sep = "")
+tbma_age_inc1[4,1] = paste(as.character(tbma_age_inc1[4,1]), "  (", as.character(tbmawt_age_inc1_2[4,1]), "%)",
+                      sep = "")
+tbma_age_inc1[4,2] = paste(as.character(tbma_age_inc1[4,2]), " (", as.character(tbmawt_age_inc1_2[4,2]), "%)",
+                      sep = "")
+tbma_age_inc1[4,3] = paste(as.character(tbma_age_inc1[4,3]), " (", as.character(tbmawt_age_inc1[4,1] + tbmawt_age_inc1[4,2]), "%)",
+                      sep = "")
+
+tbma_age_inc1
+
+# AGE ODDS RATIO, "<100% FPL"
+wald_age_inc1 = table(df_inc1$age,
+                 df_inc1$treatmentMH)
+age_odds_inc1 = oddsratio.wald(wald_age_inc1)$measure
+
+wald_wtage_inc1 = svytable(~age + treatmentMH, mydesign_inc1)
+age_wtodds_inc1 = oddsratio.wald(wald_wtage_inc1)$measure
+
+odds_vec_red = c("1.000",
+                 "0.720",
+                 "1.252",
+                 "1.963")
+
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(age_wtodds_inc1[2,2],3)), ", ", as.character(round(age_wtodds_inc1[2,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds_inc1[3,2],3)), ", ", as.character(round(age_wtodds_inc1[3,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds_inc1[4,2],3)), ", ", as.character(round(age_wtodds_inc1[4,3],3)), "0)", sep = ""))
+
+# AGE CHI-SQ, "<100% FPL"
+chi_age_inc1 = chisq.test(df_inc1$age,
+                          df_inc1$treatmentMH)
+
+chiwt_age_inc1 = svychisq(~age + treatmentMH,
+                          mydesign_inc1,
+                          statistic = "Chisq")
+
+pval = paste(as.character(round(chiwt_age_inc1$p.value,4)),
+             sep="")
+pval_vec = rep(pval, 4)
+tbma_age_inc1 = cbind(tbma_age_inc1, odds_vec_red, odds_vec)
+
+# SURVEY DESIGN, "100-400% FPL"
+mydesign_inc2 = svydesign(id = ~1,
+                          data = df_inc2,
+                          weight = ~wts,
+                          strata = ~str)
+
+# AGE, "100-400% FPL"
+tbma_age_inc2 = table(df_inc2$age,
+                      df_inc2$treatmentMH)
+Total = c(tbma_age_inc2[1,1] + tbma_age_inc2[1,2],
+          tbma_age_inc2[2,1] + tbma_age_inc2[2,2],
+          tbma_age_inc2[3,1] + tbma_age_inc2[3,2],
+          tbma_age_inc2[4,1] + tbma_age_inc2[4,2])
+tbma_age_inc2 = cbind(tbma_age_inc2, Total)
+
+tbmawt_age_inc2 = svytable(~age + treatmentMH, mydesign_inc2)
+tbmawt_age_inc2 = prop.table(tbmawt_age_inc2)*100
+tbmawt_age_inc2 = round(tbmawt_age_inc2,2)
+
+tbmawt_age_inc2_2 = svytable(~age+treatmentMH, mydesign_inc2)
+tbmawt_age_inc2_2 = prop.table(tbmawt_age_inc2_2, margin = 1)*100
+tbmawt_age_inc2_2 = round(tbmawt_age_inc2_2,2)
+
+tbma_age_inc2[1,1] = paste(as.character(tbma_age_inc2[1,1]), "  (", as.character(tbmawt_age_inc2_2[1,1]), "%)",
+                      sep = "")
+tbma_age_inc2[1,2] = paste(as.character(tbma_age_inc2[1,2]), "  (", as.character(tbmawt_age_inc2_2[1,2]), "%)",
+                      sep = "")
+tbma_age_inc2[1,3] = paste(as.character(tbma_age_inc2[1,3]), "  (", as.character(tbmawt_age_inc2[1,1] + tbmawt_age_inc2[1,2]), "%)",
+                      sep = "")
+tbma_age_inc2[2,1] = paste(as.character(tbma_age_inc2[2,1]), " (", as.character(tbmawt_age_inc2_2[2,1]), "%)",
+                      sep = "")
+tbma_age_inc2[2,2] = paste(as.character(tbma_age_inc2[2,2]), " (", as.character(tbmawt_age_inc2_2[2,2]), "%)",
+                      sep = "")
+tbma_age_inc2[2,3] = paste(as.character(tbma_age_inc2[2,3]), " (", as.character(tbmawt_age_inc2[2,1] + tbmawt_age_inc2[2,2]), "%)",
+                      sep = "")
+tbma_age_inc2[3,1] = paste(as.character(tbma_age_inc2[3,1]), "  (", as.character(tbmawt_age_inc2_2[3,1]), "%)",
+                      sep = "")
+tbma_age_inc2[3,2] = paste(as.character(tbma_age_inc2[3,2]), " (", as.character(tbmawt_age_inc2_2[3,2]), "%)",
+                      sep = "")
+tbma_age_inc2[3,3] = paste(as.character(tbma_age_inc2[3,3]), " (", as.character(tbmawt_age_inc2[3,1] + tbmawt_age_inc2[3,2]), "%)",
+                      sep = "")
+tbma_age_inc2[4,1] = paste(as.character(tbma_age_inc2[4,1]), "  (", as.character(tbmawt_age_inc2_2[4,1]), "%)",
+                      sep = "")
+tbma_age_inc2[4,2] = paste(as.character(tbma_age_inc2[4,2]), " (", as.character(tbmawt_age_inc2_2[4,2]), "%)",
+                      sep = "")
+tbma_age_inc2[4,3] = paste(as.character(tbma_age_inc2[4,3]), " (", as.character(tbmawt_age_inc2[4,1] + tbmawt_age_inc2[4,2]), "%)",
+                      sep = "")
+
+tbma_age_inc2
+
+# AGE ODDS RATIO, "100-400% FPL"
+wald_age_inc2 = table(df_inc2$age,
+                      df_inc2$treatmentMH)
+age_odds_inc2 = oddsratio.wald(wald_age_inc2)$measure
+
+wald_wtage_inc2 = svytable(~age + treatmentMH, mydesign_inc2)
+age_wtodds_inc2 = oddsratio.wald(wald_wtage_inc2)$measure
+age_wtodds_inc2
+
+odds_vec_red = c("1.000",
+                 "1.097",
+                 "0.955",
+                 "1.991")
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(age_wtodds_inc2[2,2],3)), ", ", as.character(round(age_wtodds_inc2[2,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds_inc2[3,2],3)), ", ", as.character(round(age_wtodds_inc2[3,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds_inc2[4,2],3)), ", ", as.character(round(age_wtodds_inc2[4,3],3)), "0)", sep = ""))
+
+# AGE CHI-SQ, "100-400% FPL"
+chi_age_inc2 = chisq.test(df_inc2$age,
+                          df_inc2$treatmentMH)
+
+chiwt_age_inc2 = svychisq(~age + treatmentMH,
+                          mydesign_inc2,
+                          statistic = "Chisq")
+
+pval = paste(as.character(round(chiwt_age_inc2$p.value,4)),
+             sep="")
+pval_vec = rep(pval, 4)
+tbma_age_inc2 = cbind(tbma_age_inc2, odds_vec_red, odds_vec)
+
+# SURVEY DESIGN, ">400% FPL"
+mydesign_inc3 = svydesign(id = ~1,
+                          data = df_inc3,
+                          weight = ~wts,
+                          strata = ~str)
+
+# AGE, ">400% FPL"
+tbma_age_inc3 = table(df_inc3$age,
+                      df_inc3$treatmentMH)
+Total = c(tbma_age_inc3[1,1] + tbma_age_inc3[1,2],
+          tbma_age_inc3[2,1] + tbma_age_inc3[2,2],
+          tbma_age_inc3[3,1] + tbma_age_inc3[3,2],
+          tbma_age_inc3[4,1] + tbma_age_inc3[4,2])
+tbma_age_inc3 = cbind(tbma_age_inc3, Total)
+
+tbmawt_age_inc3 = svytable(~age + treatmentMH, mydesign_inc3)
+tbmawt_age_inc3 = prop.table(tbmawt_age_inc3)*100
+tbmawt_age_inc3 = round(tbmawt_age_inc3,2)
+
+tbmawt_age_inc3_2 = svytable(~age+treatmentMH, mydesign_inc3)
+tbmawt_age_inc3_2 = prop.table(tbmawt_age_inc3_2, margin = 1)*100
+tbmawt_age_inc3_2 = round(tbmawt_age_inc3_2,2)
+
+
+tbma_age_inc3[1,1] = paste(as.character(tbma_age_inc3[1,1]), "  (", as.character(tbmawt_age_inc3_2[1,1]), "%)",
+                      sep = "")
+tbma_age_inc3[1,2] = paste(as.character(tbma_age_inc3[1,2]), "  (", as.character(tbmawt_age_inc3_2[1,2]), "%)",
+                      sep = "")
+tbma_age_inc3[1,3] = paste(as.character(tbma_age_inc3[1,3]), "  (", as.character(tbmawt_age_inc3[1,1] + tbmawt_age_inc3[1,2]), "%)",
+                      sep = "")
+tbma_age_inc3[2,1] = paste(as.character(tbma_age_inc3[2,1]), " (", as.character(tbmawt_age_inc3_2[2,1]), "%)",
+                      sep = "")
+tbma_age_inc3[2,2] = paste(as.character(tbma_age_inc3[2,2]), " (", as.character(tbmawt_age_inc3_2[2,2]), "%)",
+                      sep = "")
+tbma_age_inc3[2,3] = paste(as.character(tbma_age_inc3[2,3]), " (", as.character(tbmawt_age_inc3[2,1] + tbmawt_age_inc3[2,2]), "%)",
+                      sep = "")
+tbma_age_inc3[3,1] = paste(as.character(tbma_age_inc3[3,1]), "  (", as.character(tbmawt_age_inc3_2[3,1]), "%)",
+                      sep = "")
+tbma_age_inc3[3,2] = paste(as.character(tbma_age_inc3[3,2]), " (", as.character(tbmawt_age_inc3_2[3,2]), "%)",
+                      sep = "")
+tbma_age_inc3[3,3] = paste(as.character(tbma_age_inc3[3,3]), " (", as.character(tbmawt_age_inc3[3,1] + tbmawt_age_inc3[3,2]), "%)",
+                      sep = "")
+tbma_age_inc3[4,1] = paste(as.character(tbma_age_inc3[4,1]), "  (", as.character(tbmawt_age_inc3_2[4,1]), "%)",
+                      sep = "")
+tbma_age_inc3[4,2] = paste(as.character(tbma_age_inc3[4,2]), " (", as.character(tbmawt_age_inc3_2[4,2]), "%)",
+                      sep = "")
+tbma_age_inc3[4,3] = paste(as.character(tbma_age_inc3[4,3]), " (", as.character(tbmawt_age_inc3[4,1] + tbmawt_age_inc3[4,2]), "%)",
+                      sep = "")
+tbma_age_inc3
+
+# AGE ODDS RATIO, ">400% FPL"
+wald_age_inc3 = table(df_inc3$age,
+                 df_inc3$treatmentMH)
+age_odds_inc3 = oddsratio.wald(wald_age_inc3)$measure
+
+wald_wtage_inc3 = svytable(~age + treatmentMH, mydesign_inc3)
+age_wtodds_inc3 = oddsratio.wald(wald_wtage_inc3)$measure
+age_wtodds_inc3
+
+odds_vec_red = c("1.000",
+                 "0.793",
+                 "1.561",
+                 "3.783")
+
+odds_vec = c("1.000",
+             paste("(", as.character(round(age_wtodds_inc3[2,2],3)), ", ", as.character(round(age_wtodds_inc3[2,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds_inc3[3,2],3)), ", ", as.character(round(age_wtodds_inc3[3,3],3)), ")", sep = ""),
+             paste("(", as.character(round(age_wtodds_inc3[4,2],3)), ", ", as.character(round(age_wtodds_inc3[4,3],3)), ")", sep = ""))
+
+
+
+# AGE CHI-SQ, ">400% FPL"
+chi_age_inc3 = chisq.test(df_inc3$age,
+                          df_inc3$treatmentMH)
+
+# conservative PSU adjustment
+options(survey.lonely.psu="adjust")
+chiwt_age_inc3 = svychisq(~age+treatmentMH,
+                          design = mydesign_inc3,
+                          statistic = "Chisq")
+# PSU reset to default
+options(survey.lonely.psu="fail")
+
+pval = paste(as.character(round(chiwt_age_inc3$p.value,4)), "*",
+             sep="")
+pval_vec = rep(pval, 4)
+tbma_age_inc3 = cbind(tbma_age_inc3, odds_vec_red, odds_vec)
+```
+
+```{r}
+# Produce a 3-way contingency table and run the Cochran-Mantel-Haenszel test
+tbma_all = svytable(~age + treatmentMH + income_recode,
+                    mydesign)
+cmh_output = mantelhaen.test(tbma_all)
+pval = "<0.001***"
+
+# Create the necessary vectors to include the CMH p-value to the output table
+# cbind() the vectors to their respective tables
+
+# CMH CHI-SQ, "<100% FPL"
+pval_cmh_vec = rep("",4)
+tbma_age_inc1 = cbind(tbma_age_inc1, pval_cmh_vec)
+
+# CMH CHI-SQ, "100-400% FPL"
+pval_cmh_vec = rep(pval,4)
+tbma_age_inc2 = cbind(tbma_age_inc2, pval_cmh_vec)
+
+# CMH CHI-SQ, "100-400% FPL"
+pval_cmh_vec = rep("",4)
+tbma_age_inc3 = cbind(tbma_age_inc3, pval_cmh_vec)
+```
+
+```{r}
+# Produce a table of all variables using rbind() named kbl_ma (i.e. ma = multivariate analysis)
+kbl_ma = rbind(tbma_age_inc1,
+               tbma_age_inc2,
+               tbma_age_inc3)
+
+# Convert kbl_ma into the dataframe kbl_df_ma; name rows and columns
+kbl_df_ma = data.frame(kbl_ma)
+colnames(kbl_df_ma) = c("Not Received", "Received", "Total",
+                        "Wald Odds Ratio", "Wald Odds Ratio (95% CI)", "Cochran-Mantel-Haenszel (CMH) Test (p-value)")
+rownames(kbl_df_ma) = c(c("18-24 yrs", "25-44 yrs","45-64 yrs", "65+ yrs"),
+                        c("18-24 yrs ", "25-44 yrs ","45-64 yrs ", "65+ yrs "),
+                        c("18-24 yrs  ", "25-44 yrs  ","45-64 yrs  ", "65+ yrs  "))
+
+# Convert the p-value columns into factors (to ensure that kableExtra can compress the values in the ouptut)
+kbl_df_ma[,5] = factor(kbl_df_ma[,5])
+kbl_df_ma[,5] = factor(kbl_df_ma[,5])
+
+# Use the kableExtra package to produce latex table output
+kbl(kbl_df_ma,
+    format = "latex",
+    booktabs = T,
+    caption = "Table 3: Multivariate Analyses",
+    col.names = c("Not Received", "Received", "Total", "Wald Odds Ratio",
+                  "Wald Odds Ratio (95% CI)", "Cochran-Mantel-Haenszel (CMH) Test (p-value)"),
+    align = c("cccccc")) %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Mental Health Treatment (Response)" = 5, " " = 1), bold = T) %>%
+  column_spec(5, width = "2.82cm") %>%
+  column_spec(6, width = "2.82cm") %>%
+  column_spec(7, width = "3.00cm") %>%
+  pack_rows("Age, Income Level: <100% FPL", 1, 4) %>%
+  pack_rows("Age, Income Level: 100-400% FPL", 5, 8) %>%
+  pack_rows("Age, Income Level: >400% FPL", 9, 12) %>%
+  collapse_rows(columns = 6, valign = "middle", latex_hline = "none") %>%
+  collapse_rows(columns = 7, valign = "middle", latex_hline = "none") %>%
+  footnote(general = c("Alpha levels of 0.05 (*), 0.01 (**), and 0.001 (***) were used in inferential procedures.",
+                       "The Wald odds ratio (95% CI) indicates the odds of receiving mental health treatment relative to baseline.",
+                       "Percent estimates, Wald odds ratios, Pearson's chi-squared tests, and the CMH test were adjusted for sampling weight."),
+           general_title = "") %>%
+  landscape()
+```
+
+### Multivariate Visualizations
+
+```{r}
+# For age vs the response, split by the levels of income level:
+# 1. png() function for .png output; change the name of "Var.png" for each variable
+# png("Var.png",
+#     width = 2000,
+#     height = 1200,
+#     res = 200)
+
+# 2. Prepare plot output settings
+# par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+# 3. Produce a stacked percent bar graph
+# a. Use svytable() and prop.table() to produce a table of weighted proportions
+# b. Transpose the table using t() and reorder the variables so that the independent variable is on the x-axis
+# c.
+# barplot(bar_age,
+#        main = "Var (Bar Graph)",
+#        xlab = "",
+#        ylab = "Percent (Weight-Adjusted)",
+#        ylim = c(0,90),
+#        col = c(4,2),
+#        border = "white")
+
+# 4. Produce a standardized bag graph (that mirrors the stacked bar graph)
+# a. Use addmargins(bar_age,2) to produce a table with appropriate margins
+# b. Calculate ratio percentages
+# standardbar_age[1,] = standardbar_age[1,]/standardbar_age[3,]
+# standardbar_age[2,] = standardbar_age[2,]/standardbar_age[3,]
+# c. Remove margin row 
+# standardbar_age = standardbar_age[c(1,2),]
+# d.
+# barplot(standardbar_age,
+#         main = "Age (Standardized Bar Graph)",
+#         xlab = "Age",
+#         ylab = "Ratio (Weight-Adjusted)",
+#         col = c(4,2),
+#         border = "white")
+
+# 5. Prepare legend output settings
+# par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+# 6. Produce the  legend
+# plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+# legend(x = "bottom",
+#        title = "Mental Health Treatment",
+#        legend = c("Received", "Not Received"), 
+#        fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+#        xpd = TRUE)
+
+# 7. dev.off() to finalize the .png file
+
+# AGE, "<100% FPL"
+png("Age, Income Level, 100 FPL.png",
+    width = 2000,
+    height = 1200,
+    res = 200)
+
+par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+bar_age_inc1 = svytable(~age + treatmentMH, mydesign_inc1)
+bar_age_inc1 = prop.table(bar_age_inc1)*100
+bar_age_inc1 = t(bar_age_inc1)[c(2,1),]
+
+barplot(bar_age_inc1,
+        main = "<100% FPL (Bar Graph)",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,90),
+        col = c(4,2),
+        border = "white")
+
+standardbar_age_inc1 = addmargins(bar_age_inc1, 1)
+standardbar_age_inc1[1,] = standardbar_age_inc1[1,]/standardbar_age_inc1[3,]
+standardbar_age_inc1[2,] = standardbar_age_inc1[2,]/standardbar_age_inc1[3,]
+standardbar_age_inc1 = standardbar_age_inc1[c(1,2),]
+
+barplot(standardbar_age_inc1,
+        main = "<100% FPL (Standardized Bar Graph)",
+        xlab = "Age",
+        ylab = "Ratio (Weight-Adjusted)",
+        col = c(4,2),
+        border = "white")
+
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+legend(x = "bottom",
+       title = "Mental Health Treatment",
+       legend = c("Received", "Not Received"), 
+       fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+       xpd = TRUE)
+
+dev.off()
+
+
+# AGE, "100-400% FPL"
+png("Age, Income Level, 100-400 FPL.png",
+    width = 2000,
+    height = 1200,
+    res = 200)
+
+par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+bar_age_inc2 = svytable(~age + treatmentMH, mydesign_inc2)
+bar_age_inc2 = prop.table(bar_age_inc2)*100
+bar_age_inc2 = t(bar_age_inc2)[c(2,1),]
+
+barplot(bar_age_inc2,
+        main = "100-400% FPL (Bar Graph)",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,90),
+        col = c(4,2),
+        border = "white")
+
+standardbar_age_inc2 = addmargins(bar_age_inc2, 1)
+standardbar_age_inc2[1,] = standardbar_age_inc2[1,]/standardbar_age_inc2[3,]
+standardbar_age_inc2[2,] = standardbar_age_inc2[2,]/standardbar_age_inc2[3,]
+standardbar_age_inc2 = standardbar_age_inc2[c(1,2),]
+
+barplot(standardbar_age_inc2,
+        main = "100-400% FPL (Standardized Bar Graph)",
+        xlab = "Age",
+        ylab = "Ratio (Weight-Adjusted)",
+        col = c(4,2),
+        border = "white")
+
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+legend(x = "bottom",
+       title = "Mental Health Treatment",
+       legend = c("Received", "Not Received"), 
+       fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+       xpd = TRUE)
+
+dev.off()
+
+# AGE, ">400% FPL"
+png("Age, Income Level, 400 FPL.png",
+    width = 2000,
+    height = 1200,
+    res = 200)
+
+par(oma = c(2,0,0,0), mfrow = c(1, 2), mar = c(4, 4.5, 2, 2))
+
+bar_age_inc3 = svytable(~age + treatmentMH, mydesign_inc3)
+bar_age_inc3 = prop.table(bar_age_inc3)*100
+bar_age_inc3 = t(bar_age_inc3)[c(2,1),]
+
+barplot(bar_age_inc3,
+        main = ">400% FPL (Bar Graph)",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,90),
+        col = c(4,2),
+        border = "white")
+
+standardbar_age_inc3 = addmargins(bar_age_inc3, 1)
+standardbar_age_inc3[1,] = standardbar_age_inc3[1,]/standardbar_age_inc3[3,]
+standardbar_age_inc3[2,] = standardbar_age_inc3[2,]/standardbar_age_inc3[3,]
+standardbar_age_inc3 = standardbar_age_inc3[c(1,2),]
+
+barplot(standardbar_age_inc3,
+        main = ">400% FPL (Standardized Bar Graph)",
+        xlab = "Age",
+        ylab = "Ratio (Weight-Adjusted)",
+        col = c(4,2),
+        border = "white")
+
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+legend(x = "bottom",
+       title = "Mental Health Treatment",
+       legend = c("Received", "Not Received"), 
+       fill=c(4,2), cex=1, horiz = TRUE, bty = "l",
+       xpd = TRUE)
+
+dev.off()
+
+```
+
+### Data Brief Visualizations
+
+Relative access to mental health treatment of New York City adults by age and income level, 2018"
+
+```{r}
+library(magick)
+# Use the kableExtra package to produce latex table output
+kbl(kbl_df_ma,
+    format = "latex",
+    booktabs = T,
+    caption = "Table 1: Access to mental health treatment among New York City adults by age and income level, 2018",
+    col.names = c("Not Received", "Received", "Total", "Wald Odds Ratio",
+                  "Wald Odds Ratio (95% CI)", "Cochran-Mantel-Haenszel (CMH) Test (p-value)"),
+    align = c("cccccc")) %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Mental Health Treatment (Response)" = 5, " " = 1), bold = T) %>%
+  column_spec(5, width = "2.82cm") %>%
+  column_spec(6, width = "2.82cm") %>%
+  column_spec(7, width = "3.00cm") %>%
+  pack_rows("Age, Household Income: <100% FPL", 1, 4) %>%
+  pack_rows("Age, Household Income: 100-400% FPL", 5, 8) %>%
+  pack_rows("Age, Household Income: >400% FPL", 9, 12) %>%
+  collapse_rows(columns = 6, valign = "middle", latex_hline = "none") %>%
+  collapse_rows(columns = 7, valign = "middle", latex_hline = "none") %>%
+  footnote(general = c("Alpha levels of 0.05 (*), 0.01 (**), and 0.001 (***) used in inferential procedures.",
+                       "The Wald odds ratio indicate the odds of receiving mental health treatment relative to baseline.",
+                       "Percent estimates, Wald odds ratios, and the CMH test adjusted for sampling weight."),
+           general_title = "") %>%
+  landscape()
+
+```
+
+```{r}
+png("MHT_Age_Income Level.png",
+    width = 1900,
+    height = 800,
+    res = 200)
+
+par(oma = c(2.75,0,3,0), mfrow = c(1, 3), mar = c(4, 4.5, 2, 2), mgp = c(2.25,1,0), las=1)
+
+standardbar_age_inc1 = standardbar_age_inc1[2,]*100
+standardbar_age_inc2 = standardbar_age_inc2[2,]*100
+standardbar_age_inc3 = standardbar_age_inc3[2,]*100
+
+barplot(standardbar_age_inc1,
+        main = "<100% FPL",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,10),
+        col = c(2),
+        border = "white")
+
+barplot(standardbar_age_inc2,
+        main = "100-400% FPL",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,10),
+        col = c(2),
+        border = "white")
+
+barplot(standardbar_age_inc3,
+        main = ">400% FPL",
+        xlab = "Age",
+        ylab = "Percent (Weight-Adjusted)",
+        ylim = c(0,10),
+        col = c(2),
+        border = "white")
+
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+
+plot(0,0, type = "l", bty = "n", axes=FALSE, xlab="", ylab="")
+legend(x = "bottom",
+       title = "Mental Health Treatment",
+       legend = c("Not Received"), 
+       fill=c(2), cex=1, horiz = TRUE, bty = "l",
+       xpd = TRUE)
+
+mtext(expression(bold("   Generally, older New York City adults with greater household incomes had greater access to mental health treatment.\n   Relative lack of access to mental health treatment among New York City adults by age and household income, 2018")),side=3,line=-3, adj = 0,outer=TRUE)
+
+dev.off()
+
+```
+
+### Description of the Population
+
+```{r}
+# Create a dataframe that contains the variables relevant to the RQ
+df2 = cbind(nyc_chs$agegroup,
+            nyc_chs$birthsex,
+            nyc_chs$newrace,
+            nyc_chs$imputed_povertygroup,
+            nyc_chs$mood11,
+            nyc_chs$wt19_dual,
+            nyc_chs$strata)
+
+colnames(df2) = c("age",
+                  "sex",
+                  "race",
+                  "income",
+                  "treatmentMH",
+                  "wts",
+                  "str")
+
+df2 = data.frame(df2)
+
+# Remove missing values
+df2 = na.omit(df2)
+
+# Convert variables to factor variables, check contrasts
+df2$age = factor(df2$age,
+                 levels = c(1,2,3,4),
+                 labels = c("18-24 yrs", "25-44 yrs",
+                            "45-64 yrs", "65+ yrs"))
+contrasts(df2$age)
+
+df2$sex = factor(df2$sex,
+                 levels = c(1,2),
+                 labels = c("Male", "Female"))
+contrasts(df2$sex)
+
+df2$race = factor(df2$race,
+                  levels = c(1,2,3,4,5),
+                  labels = c("White", "Black", "Hispanic", "Asian", "Other"))
+contrasts(df2$race)
+
+df2$income_recode = ifelse(df2$income==1, 1,
+                           ifelse(df2$income==2, 2,
+                                  ifelse(df2$income==3, 2,
+                                         ifelse(df2$income==4, 3, 3))))
+df2$income_recode = factor(df2$income_recode,
+                           levels = c(1,2,3),
+                           labels = c("<100% FPL", "100-400% FPL", ">400% FPL"))
+contrasts(df2$income_recode)
+
+df2$treatmentMH = factor(df2$treatmentMH,
+                        levels = c(1,2),
+                        labels = c("Not Received","Received"))
+contrasts(df2$treatmentMH)
+
+# Reorder dataframe columns
+col_order = c("age",
+              "sex",
+              "race",
+              "income_recode",
+              "treatmentMH",
+              "wts",
+              "str")
+
+df2 = df2[, col_order]
+colnames(df2)
+```
+
+```{r}
+mydesign = svydesign(id = ~1,
+                     data = df2,
+                     weight = ~wts,
+                     strata = ~str)
+
+# MENTAL HEALTH TREATMENT
+mht_desc = svytable(~treatmentMH, mydesign)
+prop.table(mht_desc)
+
+# AGE
+age_desc = svytable(~age + treatmentMH, mydesign)
+prop.table(age_desc, margin = 1)
+
+# SEX
+sex_desc = svytable(~sex + treatmentMH, mydesign)
+prop.table(sex_desc, margin = 1)
+
+# RACE
+race_desc = svytable(~race + treatmentMH, mydesign)
+prop.table(race_desc, margin = 1)
+
+# HOUSEHOLD INCOME
+inc_desc = svytable(~income_recode + treatmentMH, mydesign)
+prop.table(inc_desc, margin = 1)
+```
