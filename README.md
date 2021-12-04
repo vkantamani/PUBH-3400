@@ -1,9 +1,7 @@
 # PUBH-3400
 PUBH 3400 Data Science and Health Equity
 
-ASSESSMENT 5 – CREATE AN EPI DATA BRIEF 
-DUE December 8th   (25 points) 
-General Instructions: Your group will create an Epi Data Brief to respond to a research question your group decides upon. The data brief can be no longer than 2 pages. You will submit a data brief that has the following sections:
+Your group will create an Epi Data Brief to respond to a research question your group decides upon. The data brief can be no longer than 2 pages. You will submit a data brief that has the following sections:
 
     1. Title 
     2. Background 
