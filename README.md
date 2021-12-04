@@ -1,5 +1,5 @@
 # PUBH-3400
-PUBH 3400 Data Science and Health Equity
+(CU) PUBH 3400 Data Science and Health Equity
 
 ASSESSMENT 5 – CREATE AN EPI DATA BRIEF 
 DUE December 8th   (25 points) 
